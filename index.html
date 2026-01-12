@@ -80,14 +80,16 @@
         // 從雲端讀取資料
         async function fetchCloudData(key) {
             try {
-                const response = await fetch(`${GAS_URL}?key=${key}`);
-                return await response.json();
+                // 加入 _t=Date.now() 確保每次都向 Google 要最新資料，不使用舊快取
+                const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`);
+                const text = await response.text();
+                console.log("原始回傳內容:", text); // 除錯用
+                return JSON.parse(text);
             } catch (e) {
-                console.error("讀取錯誤:", e);
+                console.error("讀取失敗:", e);
                 return {};
             }
-        }
-
+         }
         // 上傳資料到雲端
         async function updateCloudData(date, text) {
             statusText.innerText = "☁️ 儲存中...";
