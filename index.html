@@ -49,7 +49,7 @@
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbyCDH8iJ8vBqSEWztMmrPGoOl-TDBW7jIZ9o-oyEKTD-a9rHVu54_X61E1SWEP1sO-JfA/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyQxxFoogK1SZ299UJ4T4ogV-KrQZStGZ7qdbWdNIxJqMcfQwAAg0IYGgH7UsxM9AqHpg/exec";
         const yearSelect = document.getElementById('yearSelect');
         const monthSelect = document.getElementById('monthSelect');
         const calendarBody = document.getElementById('calendarBody');
@@ -80,22 +80,25 @@
         // 從雲端讀取資料
         async function fetchCloudData(key) {
             try {
-                // 加上時間戳記 _t 確保不會抓到瀏覽器的舊暫存檔
-                const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`);
+                // 使用新網址，並加上 redirect: 'follow' 來處理 Google 的重新導向
+                const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`, {
+                    method: 'GET',
+                    redirect: 'follow'
+                });
+        
+                if (!response.ok) throw new Error('網路回應異常');
+        
                 const text = await response.text();
+                console.log("讀取成功！內容：", text);
         
-                console.log("正在嘗試讀取 Key:", key);
-                console.log("雲端回傳原始內容:", text);
-
-                // 如果雲端回傳空值或非 JSON，給予預設物件 {}
-                if (!text || text === "null" || text === "{}") return {};
-        
+                // 防呆：如果回傳是空的或 null，回傳空白物件
+                if (!text || text === "null") return {};
                 return JSON.parse(text);
             } catch (e) {
-                console.error("雲端讀取發生錯誤:", e);
+                console.error("讀取過程發生錯誤：", e);
                 return {};
             }
-       }
+      }  
         // 上傳資料到雲端
         async function updateCloudData(date, text) {
             statusText.innerText = "☁️ 儲存中...";
