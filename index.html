@@ -80,16 +80,22 @@
         // 從雲端讀取資料
         async function fetchCloudData(key) {
             try {
-                // 加入 _t=Date.now() 確保每次都向 Google 要最新資料，不使用舊快取
+                // 加上時間戳記 _t 確保不會抓到瀏覽器的舊暫存檔
                 const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`);
                 const text = await response.text();
-                console.log("原始回傳內容:", text); // 除錯用
+        
+                console.log("正在嘗試讀取 Key:", key);
+                console.log("雲端回傳原始內容:", text);
+
+                // 如果雲端回傳空值或非 JSON，給予預設物件 {}
+                if (!text || text === "null" || text === "{}") return {};
+        
                 return JSON.parse(text);
             } catch (e) {
-                console.error("讀取失敗:", e);
+                console.error("雲端讀取發生錯誤:", e);
                 return {};
             }
-         }
+       }
         // 上傳資料到雲端
         async function updateCloudData(date, text) {
             statusText.innerText = "☁️ 儲存中...";
@@ -118,8 +124,9 @@
             const firstDay = new Date(year, month, 1).getDay();
             const lastDate = new Date(year, month + 1, 0).getDate();
             const today = new Date();
-
-            const savedData = await fetchCloudData(getStorageKey());
+            const storageKey = getStorageKey(); // 取得目前的 Key
+            const savedData = await fetchCloudData(storageKey); // 務必有 await
+            // ... 接下來才會開始畫格子 ...
 
             calendarBody.innerHTML = '';
             let dateCounter = 1;
