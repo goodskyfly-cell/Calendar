@@ -49,7 +49,7 @@
     </div>
 
     <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbzHcjcXKsPEIFDNis670I1EuGID2QCvJf5s59gsQH4bt3f5vdLxg_B4I-bqV7Gs2aDv/exec";
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbxTbmF5fS85wY05e9eIMobeTKXjZz97S3VXZICcTKaCTw5oSsh1yf_opiA1w0OdJi50/exec";
         const yearSelect = document.getElementById('yearSelect');
         const monthSelect = document.getElementById('monthSelect');
         const calendarBody = document.getElementById('calendarBody');
@@ -78,18 +78,24 @@
         }
 
         // 從雲端讀取資料
-        async function fetchCloudData(key) {
+       async function fetchCloudData(key) {
     try {
+        // 加上時間戳記防止快取，並強制跟隨導向
         const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`, {
             method: 'GET',
-            redirect: 'follow' // 解決 302 Found 導致的讀取失敗
+            mode: 'cors', // 明確要求跨域模式
+            redirect: 'follow' 
         });
+        
+        if (!response.ok) throw new Error('網路連線失敗');
+        
         const text = await response.text();
-        console.log("雲端讀取原始內容:", text);
-        if (!text || text === "null") return {};
+        console.log("從雲端抓取的資料：", text);
+        
+        if (!text || text === "null" || text === "{}") return {};
         return JSON.parse(text);
     } catch (e) {
-        console.error("雲端讀取失敗:", e);
+        console.error("【讀取過程發生錯誤】：", e);
         return {};
     }
 }
