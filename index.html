@@ -55,137 +55,144 @@
             <tbody id="calendarBody"></tbody>
         </table>
     </div>
+<script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyCDH8iJ8vBqSEWztMmrPGoOl-TDBW7jIZ9o-oyEKTD-a9rHVu54_X61E1SWEP1sO-JfA/exec";
+    
+    // 1. 國定假日設定
+    const holidays = {
+        "1-1": "元旦",
+        "2-28": "和平紀念日",
+        "4-4": "兒童節",
+        "4-5": "清明節",
+        "5-1": "勞動節",
+        "10-10": "國慶日"
+    };
 
-    <script>
-        const GAS_URL = "https://script.google.com/macros/s/AKfycbxTbmF5fS85wY05e9eIMobeTKXjZz97S3VXZICcTKaCTw5oSsh1yf_opiA1w0OdJi50/exec";
-        // 1. 國定假日設定
-        const holidays = {
-            "1-1": "元旦",
-            "2-28": "和平紀念日",
-            "4-4": "兒童節",
-            "4-5": "清明節",
-            "5-1": "勞動節",
-            "10-10": "國慶日"
-        };
-        const yearSelect = document.getElementById('yearSelect');
-        const monthSelect = document.getElementById('monthSelect');
-        const calendarBody = document.getElementById('calendarBody');
-        const statusText = document.getElementById('status');
-        const loadingOverlay = document.getElementById('loading');
+    const yearSelect = document.getElementById('yearSelect');
+    const monthSelect = document.getElementById('monthSelect');
+    const calendarBody = document.getElementById('calendarBody');
+    const statusText = document.getElementById('status');
+    const loadingOverlay = document.getElementById('loading');
 
-        function initSelectors() {
-            const currentYear = new Date().getFullYear();
-            const currentMonth = new Date().getMonth() + 1;
-            for (let y = 2020; y <= 2035; y++) {
-                let opt = document.createElement('option');
-                opt.value = y; opt.innerHTML = y;
-                if (y === currentYear) opt.selected = true;
-                yearSelect.appendChild(opt);
-            }
-            for (let m = 1; m <= 12; m++) {
-                let opt = document.createElement('option');
-                opt.value = m; opt.innerHTML = m;
-                if (m === currentMonth) opt.selected = true;
-                monthSelect.appendChild(opt);
-            }
+    // 初始化選單
+    function initSelectors() {
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1;
+        for (let y = 2020; y <= 2035; y++) {
+            let opt = document.createElement('option');
+            opt.value = y; opt.innerHTML = y;
+            if (y === currentYear) opt.selected = true;
+            yearSelect.appendChild(opt);
         }
-
-        function getStorageKey() {
-            return `cal-data-${yearSelect.value}-${monthSelect.value}`;
+        for (let m = 1; m <= 12; m++) {
+            let opt = document.createElement('option');
+            opt.value = m; opt.innerHTML = m;
+            if (m === currentMonth) opt.selected = true;
+            monthSelect.appendChild(opt);
         }
-
-       // 2. 雲端讀取 (帶有防快取)
-       async function fetchCloudData(key) {
-    try {
-        // 加上時間戳記防止快取，並強制跟隨導向
-        const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`, {
-            method: 'GET',
-            mode: 'cors', // 明確要求跨域模式
-            redirect: 'follow' 
-        });
-        
-        if (!response.ok) throw new Error('網路連線失敗');
-        
-        const text = await response.text();
-        console.log("從雲端抓取的資料：", text);
-        
-        if (!text || text === "null" || text === "{}") return {};
-        return JSON.parse(text);
-    } catch (e) {
-        console.error("【讀取過程發生錯誤】：", e);
-        return {};
     }
-}
-        // 3. 雲端儲存
-        async function updateCloudData(date, text) {
-    statusText.innerText = "☁️ 儲存中...";
-    const key = getStorageKey();
-    const currentMonthData = await fetchCloudData(key);
-    currentMonthData[`day-${date}`] = text;
 
-    try {
-        await fetch(GAS_URL, {
-            method: "POST",
-            mode: "no-cors", // 跨網域寫入必要設定
-            body: JSON.stringify({ key: key, value: JSON.stringify(currentMonthData) })
-        });
-        statusText.innerText = "✅ 已同步至雲端";
-    } catch (e) {
-        statusText.innerText = "❌ 儲存失敗";
-        console.error("儲存失敗原因:", e);
+    function getStorageKey() {
+        return `cal-data-${yearSelect.value}-${monthSelect.value}`;
     }
-}
 
-        // 4. 渲染月曆 (整合假日顯示)
-        async function renderCalendar() {
-            loadingOverlay.style.display = 'flex';
-            const year = parseInt(yearSelect.value);
-            const month = parseInt(monthSelect.value) - 1;
-            const firstDay = new Date(year, month, 1).getDay();
-            const lastDate = new Date(year, month + 1, 0).getDate();
-            const today = new Date();
-            const storageKey = getStorageKey(); // 取得目前的 Key
-            const savedData = await fetchCloudData(storageKey); // 務必有 await
-            // ... 接下來才會開始畫格子 ...
+    // 2. 雲端讀取 (帶有防快取)
+    async function fetchCloudData(key) {
+        try {
+            const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`, {
+                method: 'GET',
+                redirect: 'follow'
+            });
+            const text = await response.text();
+            console.log("從雲端讀取資料：", text);
+            if (!text || text === "null" || text === "{}") return {};
+            return JSON.parse(text);
+        } catch (e) {
+            console.error("讀取失敗:", e);
+            return {};
+        }
+    }
 
-            calendarBody.innerHTML = '';
-            let dateCounter = 1;
+    // 3. 雲端儲存
+    async function updateCloudData(date, text) {
+        statusText.innerText = "☁️ 儲存中...";
+        const key = getStorageKey();
+        const currentMonthData = await fetchCloudData(key);
+        currentMonthData[`day-${date}`] = text;
 
-            for (let i = 0; i < 6; i++) {
-                let row = document.createElement('tr');
-                let hasActiveCell = false;
-                for (let j = 0; j < 7; j++) {
-                    let cell = document.createElement('td');
-                    if ((i === 0 && j < firstDay) || dateCounter > lastDate) {
-                        cell.innerHTML = '';
-                    } else {
-                        hasActiveCell = true;
-                        const dateNum = dateCounter;
-                        const noteContent = savedData[`day-${dateNum}`] || "";
-                        
-                        cell.innerHTML = `<span class="date-num">${dateNum}</span>
-                                          <div class="note-area" contenteditable="true">${noteContent}</div>`;
-                        
-                        const noteDiv = cell.querySelector('.note-area');
-                        noteDiv.onblur = function() { updateCloudData(dateNum, this.innerText); };
+        try {
+            await fetch(GAS_URL, {
+                method: "POST",
+                mode: "no-cors",
+                body: JSON.stringify({ key: key, value: JSON.stringify(currentMonthData) })
+            });
+            statusText.innerText = "✅ 已同步至雲端";
+        } catch (e) {
+            statusText.innerText = "❌ 儲存失敗";
+        }
+    }
 
-                        if (j === 0 || j === 6) cell.classList.add('weekend');
-                        if (dateNum === today.getDate() && month === today.getMonth() && year === today.getFullYear()) {
-                            cell.classList.add('today');
-                        }
-                        dateCounter++;
+    // 4. 渲染月曆 (整合假日顯示)
+    async function renderCalendar() {
+        if(loadingOverlay) loadingOverlay.style.display = 'flex';
+        const year = parseInt(yearSelect.value);
+        const month = parseInt(monthSelect.value);
+        const firstDay = new Date(year, month - 1, 1).getDay();
+        const lastDate = new Date(year, month, 0).getDate();
+        const today = new Date();
+
+        const savedData = await fetchCloudData(getStorageKey());
+
+        calendarBody.innerHTML = '';
+        let dateCounter = 1;
+
+        for (let i = 0; i < 6; i++) {
+            let row = document.createElement('tr');
+            for (let j = 0; j < 7; j++) {
+                let cell = document.createElement('td');
+                if ((i === 0 && j < firstDay) || dateCounter > lastDate) {
+                    cell.innerHTML = '';
+                } else {
+                    const dateNum = dateCounter;
+                    const noteContent = savedData[`day-${dateNum}`] || "";
+                    
+                    // 🔍 檢查假日
+                    const holidayKey = `${month}-${dateNum}`;
+                    const holidayName = holidays[holidayKey] || "";
+                    const isHoliday = holidayName !== "";
+
+                    // 設定假日樣式
+                    let holidayLabel = isHoliday ? `<span style="color:red; font-size:11px; margin-left:5px;">${holidayName}</span>` : "";
+                    let dateStyle = (isHoliday || j === 0 || j === 6) ? "color:red; font-weight:bold;" : "font-weight:bold;";
+
+                    cell.innerHTML = `
+                        <span style="${dateStyle}">${dateNum}${holidayLabel}</span>
+                        <div class="note-area" contenteditable="true" style="min-height:70px; outline:none; font-size:13px;">${noteContent}</div>
+                    `;
+                    
+                    const noteDiv = cell.querySelector('.note-area');
+                    noteDiv.onblur = function() { updateCloudData(dateNum, this.innerText); };
+
+                    if (j === 0 || j === 6 || isHoliday) cell.style.backgroundColor = "#fff9f9";
+                    if (dateNum === today.getDate() && (month-1) === today.getMonth() && year === today.getFullYear()) {
+                        cell.style.border = "2px solid #4CAF50";
+                        cell.style.backgroundColor = "#e8f5e9";
                     }
-                    row.appendChild(cell);
+                    dateCounter++;
                 }
-                calendarBody.appendChild(row);
-                if (dateCounter > lastDate) break;
+                row.appendChild(cell);
             }
-            loadingOverlay.style.display = 'none';
-            statusText.innerText = "☁️ 雲端同步中";
+            calendarBody.appendChild(row);
+            if (dateCounter > lastDate) break;
         }
+        if(loadingOverlay) loadingOverlay.style.display = 'none';
+        statusText.innerText = "☁️ 雲端同步中";
+    }
 
-        initSelectors();
-        renderCalendar();
-    </script>
+    initSelectors();
+    renderCalendar();
+</script>
+
+    
 </body>
 </html>
