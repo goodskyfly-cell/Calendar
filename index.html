@@ -56,15 +56,18 @@
         </table>
     </div>
 <script>
+    // 您的 Google 表格部署網址
     const GAS_URL = "https://script.google.com/macros/s/AKfycbyCDH8iJ8vBqSEWztMmrPGoOl-TDBW7jIZ9o-oyEKTD-a9rHVu54_X61E1SWEP1sO-JfA/exec";
     
-    // 1. 國定假日設定
+    // 🚩 假日資料庫 (包含 2026 變動節慶)
     const holidays = {
         "1-1": "元旦",
+        "2-16": "除夕", "2-17": "春節", "2-18": "初二", "2-19": "初三",
         "2-28": "和平紀念日",
-        "4-4": "兒童節",
-        "4-5": "清明節",
+        "4-4": "兒童節", "4-5": "清明節",
         "5-1": "勞動節",
+        "6-19": "端午節",
+        "9-25": "中秋節",
         "10-10": "國慶日"
     };
 
@@ -72,9 +75,7 @@
     const monthSelect = document.getElementById('monthSelect');
     const calendarBody = document.getElementById('calendarBody');
     const statusText = document.getElementById('status');
-    const loadingOverlay = document.getElementById('loading');
 
-    // 初始化選單
     function initSelectors() {
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
@@ -96,7 +97,7 @@
         return `cal-data-${yearSelect.value}-${monthSelect.value}`;
     }
 
-    // 2. 雲端讀取 (帶有防快取)
+    // 雲端讀取 (帶有防快取與導向追蹤)
     async function fetchCloudData(key) {
         try {
             const response = await fetch(`${GAS_URL}?key=${key}&_t=${Date.now()}`, {
@@ -104,7 +105,7 @@
                 redirect: 'follow'
             });
             const text = await response.text();
-            console.log("從雲端讀取資料：", text);
+            console.log("雲端回傳資料：", text);
             if (!text || text === "null" || text === "{}") return {};
             return JSON.parse(text);
         } catch (e) {
@@ -113,9 +114,9 @@
         }
     }
 
-    // 3. 雲端儲存
+    // 雲端儲存
     async function updateCloudData(date, text) {
-        statusText.innerText = "☁️ 儲存中...";
+        if (statusText) statusText.innerText = "☁️ 儲存中...";
         const key = getStorageKey();
         const currentMonthData = await fetchCloudData(key);
         currentMonthData[`day-${date}`] = text;
@@ -126,21 +127,20 @@
                 mode: "no-cors",
                 body: JSON.stringify({ key: key, value: JSON.stringify(currentMonthData) })
             });
-            statusText.innerText = "✅ 已同步至雲端";
+            if (statusText) statusText.innerText = "✅ 已同步至雲端";
         } catch (e) {
-            statusText.innerText = "❌ 儲存失敗";
+            if (statusText) statusText.innerText = "❌ 儲存失敗";
         }
     }
 
-    // 4. 渲染月曆 (整合假日顯示)
     async function renderCalendar() {
-        if(loadingOverlay) loadingOverlay.style.display = 'flex';
         const year = parseInt(yearSelect.value);
         const month = parseInt(monthSelect.value);
         const firstDay = new Date(year, month - 1, 1).getDay();
         const lastDate = new Date(year, month, 0).getDate();
         const today = new Date();
 
+        // 讀取該月雲端記事資料
         const savedData = await fetchCloudData(getStorageKey());
 
         calendarBody.innerHTML = '';
@@ -156,24 +156,29 @@
                     const dateNum = dateCounter;
                     const noteContent = savedData[`day-${dateNum}`] || "";
                     
-                    // 🔍 檢查假日
+                    // 🔍 比對假日
                     const holidayKey = `${month}-${dateNum}`;
                     const holidayName = holidays[holidayKey] || "";
                     const isHoliday = holidayName !== "";
 
-                    // 設定假日樣式
-                    let holidayLabel = isHoliday ? `<span style="color:red; font-size:11px; margin-left:5px;">${holidayName}</span>` : "";
-                    let dateStyle = (isHoliday || j === 0 || j === 6) ? "color:red; font-weight:bold;" : "font-weight:bold;";
-
+                    // 樣式設定
+                    let dateColor = (isHoliday || j === 0 || j === 6) ? "red" : "black";
+                    let bgColor = (isHoliday || j === 0 || j === 6) ? "#fff9f9" : "white";
+                    
+                    cell.style.backgroundColor = bgColor;
                     cell.innerHTML = `
-                        <span style="${dateStyle}">${dateNum}${holidayLabel}</span>
-                        <div class="note-area" contenteditable="true" style="min-height:70px; outline:none; font-size:13px;">${noteContent}</div>
+                        <div style="display:flex; align-items:center;">
+                            <span style="color:${dateColor}; font-weight:bold;">${dateNum}</span>
+                            ${isHoliday ? `<span style="color:red; font-size:11px; margin-left:5px;">${holidayName}</span>` : ""}
+                        </div>
+                        <div class="note-area" contenteditable="true" 
+                             style="min-height:70px; outline:none; font-size:13px; margin-top:5px;">${noteContent}</div>
                     `;
                     
                     const noteDiv = cell.querySelector('.note-area');
                     noteDiv.onblur = function() { updateCloudData(dateNum, this.innerText); };
 
-                    if (j === 0 || j === 6 || isHoliday) cell.style.backgroundColor = "#fff9f9";
+                    // 今日高亮顯示
                     if (dateNum === today.getDate() && (month-1) === today.getMonth() && year === today.getFullYear()) {
                         cell.style.border = "2px solid #4CAF50";
                         cell.style.backgroundColor = "#e8f5e9";
@@ -185,13 +190,11 @@
             calendarBody.appendChild(row);
             if (dateCounter > lastDate) break;
         }
-        if(loadingOverlay) loadingOverlay.style.display = 'none';
-        statusText.innerText = "☁️ 雲端同步中";
+        if (statusText) statusText.innerText = "☁️ 雲端同步中";
     }
 
     initSelectors();
-    renderCalendar();
-</script>
+    renderCalendar()</script>
 
     
 </body>
