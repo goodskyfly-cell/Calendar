@@ -20,6 +20,14 @@
         .today { background-color: #e8f5e9 !important; border: 2px solid #4CAF50 !important; }
         .date-num { font-weight: bold; margin-bottom: 5px; display: block; }
         .note-area { font-size: 13px; line-height: 1.4; color: #34495e; min-height: 70px; outline: none; word-wrap: break-word; cursor: text; }
+
+        .holiday-name {
+            color: #e74c3c;
+            font-size: 11px;
+            margin-left: 5px;
+            font-weight: normal;
+        }
+        .holiday-text { color: #e74c3c !important; } /* 讓假日數字也變紅 */
         
         /* 讀取中的遮罩樣式 */
         .loading-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.7); display: flex; justify-content: center; align-items: center; z-index: 10; font-size: 14px; color: #4CAF50; font-weight: bold; }
@@ -55,6 +63,70 @@
         const calendarBody = document.getElementById('calendarBody');
         const statusText = document.getElementById('status');
         const loadingOverlay = document.getElementById('loading');
+        // 🚩 新增：國定假日資料庫 (月-日)
+const holidays = {
+    "1-1": "元旦",
+    "2-28": "和平紀念日",
+    "4-4": "兒童節",
+    "4-5": "清明節",
+    "5-1": "勞動節",
+    "10-10": "國慶日"
+};
+
+async function renderCalendar() {
+    loadingOverlay.style.display = 'flex';
+    const year = parseInt(yearSelect.value);
+    const month = parseInt(monthSelect.value); // 注意：這裡改為 1-12
+    const firstDay = new Date(year, month - 1, 1).getDay();
+    const lastDate = new Date(year, month, 0).getDate();
+    const today = new Date();
+
+    const savedData = await fetchCloudData(getStorageKey());
+
+    calendarBody.innerHTML = '';
+    let dateCounter = 1;
+
+    for (let i = 0; i < 6; i++) {
+        let row = document.createElement('tr');
+        for (let j = 0; j < 7; j++) {
+            let cell = document.createElement('td');
+            if ((i === 0 && j < firstDay) || dateCounter > lastDate) {
+                cell.innerHTML = '';
+            } else {
+                const dateNum = dateCounter;
+                const noteContent = savedData[`day-${dateNum}`] || "";
+                
+                // 🔍 檢查是否為國定假日
+                const holidayKey = `${month}-${dateNum}`;
+                const holidayName = holidays[holidayKey] || "";
+                const isHoliday = holidayName !== "";
+
+                // 建立內容
+                let holidayHtml = isHoliday ? `<span class="holiday-name">${holidayName}</span>` : "";
+                let dateClass = isHoliday || j === 0 || j === 6 ? "holiday-text" : "";
+
+                cell.innerHTML = `
+                    <span class="date-num ${dateClass}">${dateNum}${holidayHtml}</span>
+                    <div class="note-area" contenteditable="true">${noteContent}</div>
+                `;
+                
+                const noteDiv = cell.querySelector('.note-area');
+                noteDiv.onblur = function() { updateCloudData(dateNum, this.innerText); };
+
+                if (j === 0 || j === 6 || isHoliday) cell.classList.add('weekend');
+                if (dateNum === today.getDate() && (month-1) === today.getMonth() && year === today.getFullYear()) {
+                    cell.classList.add('today');
+                }
+                dateCounter++;
+            }
+            row.appendChild(cell);
+        }
+        calendarBody.appendChild(row);
+        if (dateCounter > lastDate) break;
+    }
+    loadingOverlay.style.display = 'none';
+    statusText.innerText = "☁️ 雲端同步中";
+}
 
         function initSelectors() {
             const currentYear = new Date().getFullYear();
